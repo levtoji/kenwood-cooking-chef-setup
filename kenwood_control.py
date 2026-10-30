@@ -5,8 +5,9 @@ Protokoll (aus der Kenwood-World-App):
   Auslesen (live):  GET  {userUri}/events?client_id=…&type=ws  -> {"events_url": "wss://…"}
                     danach WebSocket verbinden, JSON-Events empfangen
   Abonnieren:       POST {userApplianceUri}/subscribe
-  Einstellen:       POST {userApplianceUri}/features  [{"key": "temperature", "value": "80"}, …]
-  Bedienen:         POST /api/v1/users/{id}/appliances/{applianceId}/operate  {"command": …, "value": …}
+
+Hinweis: Steuern (Kochen) läuft über Programm-Events + RemoteStart/Stop über den Socket und ist
+hier NICHT implementiert – dieses Modul liest nur. Siehe README.
 
 Nur Standardbibliothek. Auth/HTTP/Token kommen aus kenwood_setup.
 """
@@ -190,21 +191,6 @@ def stream_events(cfg, token, native_id, on_event, once=False, timeout=70):
 # --- Steuern ---------------------------------------------------------------
 
 
-def set_features(cfg, token, appliance_uri, features):
-    body = [{"key": k, "value": str(v)} for k, v in features.items()]
-    status, resp = ks.http("POST", f"{cfg['api']}{appliance_uri}/features", data=body, headers=ks.auth_header(token))
-    print(f"  features: {status} {resp}")
-    return status == 200
-
-
-def operate(cfg, token, user_uri, appliance_id, command, value):
-    uid = user_uri.rsplit("/", 1)[-1]
-    url = f"{cfg['api']}/api/v1/users/{uid}/appliances/{appliance_id}/operate"
-    status, resp = ks.http("POST", url, data={"command": command, "value": value}, headers=ks.auth_header(token))
-    print(f"  operate: {status} {resp}")
-    return status == 200
-
-
 # --- Befehle ---------------------------------------------------------------
 
 
@@ -238,28 +224,6 @@ class _Done(Exception):
     pass
 
 
-def cmd_set(args):
-    cfg = ks.load_env()
-    token = ks.get_token(cfg)
-    features = {k: v for k, v in (("temperature", args.temperature), ("speed", args.speed), ("time", args.time), ("power", args.power)) if v is not None}
-    if not features:
-        sys.exit("Nichts zu setzen – mindestens eins von --temperature/--speed/--time/--power angeben.")
-    _, appliance_uri, _ = user_appliance(cfg, token, args.native_id)
-    if not set_features(cfg, token, appliance_uri, features):
-        sys.exit("Setzen fehlgeschlagen.")
-    print("Gesendet.")
-
-
-def cmd_operate(args):
-    cfg = ks.load_env()
-    token = ks.get_token(cfg)
-    user_uri, appliance_uri, _ = user_appliance(cfg, token, args.native_id)
-    appliance_id = appliance_uri.rsplit("/", 1)[-1]
-    if not operate(cfg, token, user_uri, appliance_id, args.command, args.value):
-        sys.exit("Befehl fehlgeschlagen.")
-    print("Gesendet.")
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--native-id", help="MAC/native_id, falls mehrere Geräte am Konto hängen")
@@ -270,18 +234,6 @@ def main():
     p_status.add_argument("--seconds", type=int, default=8, help="Sammeldauer für den Schnappschuss")
     p_status.set_defaults(func=cmd_status)
     sub.add_parser("watch", help="Live-Zustand fortlaufend ausgeben").set_defaults(func=cmd_watch)
-
-    p_set = sub.add_parser("set", help="Temperatur/Stufe/Zeit/Leistung setzen")
-    p_set.add_argument("--temperature", type=int, help="Zieltemperatur in °C")
-    p_set.add_argument("--speed", type=int, help="Rührstufe")
-    p_set.add_argument("--time", type=int, help="Zeit in Sekunden")
-    p_set.add_argument("--power", help="Leistung/an-aus (gerätespezifisch)")
-    p_set.set_defaults(func=cmd_set)
-
-    p_op = sub.add_parser("operate", help="Rohen Befehl senden (command/value)")
-    p_op.add_argument("--command", required=True)
-    p_op.add_argument("--value", required=True)
-    p_op.set_defaults(func=cmd_operate)
 
     args = parser.parse_args()
     args.func(args)

@@ -160,19 +160,6 @@ class ControlTest(unittest.TestCase):
         threading.Thread(target=serve, daemon=True).start()
         return port
 
-    def test_set_features_body(self):
-        _, appliance_uri, _ = kc.user_appliance(self.cfg, self.token, MAC)
-        kc.set_features(self.cfg, self.token, appliance_uri, {"temperature": 90, "speed": 2})
-        path, body = next((p, b) for p, b in FakeBackend.posts if p.endswith("/features"))
-        self.assertEqual(path, f"{APP_URI}/features")
-        self.assertEqual(body, [{"key": "temperature", "value": "90"}, {"key": "speed", "value": "2"}])
-
-    def test_operate_body(self):
-        kc.operate(self.cfg, self.token, "/api/v1/users/42", "abc-123", "start", "1")
-        path, body = next((p, b) for p, b in FakeBackend.posts if p.endswith("/operate"))
-        self.assertEqual(path, "/api/v1/users/42/appliances/abc-123/operate")
-        self.assertEqual(body, {"command": "start", "value": "1"})
-
     def test_user_appliance_requires_match(self):
         with self.assertRaises(SystemExit):
             kc.user_appliance(self.cfg, self.token, "UNKNOWNMAC")
