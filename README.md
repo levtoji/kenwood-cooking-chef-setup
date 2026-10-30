@@ -56,6 +56,36 @@ Nur auslesen, ohne etwas zu senden (Mac vorher manuell ins Setup-WLAN):
 python3 kenwood_setup.py probe
 ```
 
+## Auslesen und steuern (`kenwood_control.py`)
+
+Im Normalbetrieb läuft alles über die Cloud (lokal ist an der Maschine nur Port 443 offen, der
+aber nicht per HTTP antwortet; die lokale `/mac`/`/networks`/`/join`-API gibt es nur im
+Einrichtungsmodus unter `192.168.4.1`).
+
+```sh
+python3 kenwood_control.py status          # Schnappschuss, z. B. Temperatur/Status/Soll-Temp
+python3 kenwood_control.py watch           # Live-Stream der Events (Strg+C beendet)
+python3 kenwood_control.py set --temperature 80 --speed 2 --time 600
+python3 kenwood_control.py operate --command <cmd> --value <val>
+```
+
+Protokoll:
+
+| Zweck | Aufruf |
+|---|---|
+| Live-Events (WebSocket-URL) | `GET {userUri}/events?client_id=…&type=ws` → `{"events_url": "wss://…"}` |
+| Abonnieren | `POST {userApplianceUri}/subscribe` |
+| Einstellen | `POST {userApplianceUri}/features` mit `[{"key":"temperature","value":"80"}, …]` |
+| Bedienen | `POST /api/v1/users/{id}/appliances/{applianceId}/operate` mit `{"command","value"}` |
+
+Event-Format der Maschine:
+`{"native_id":"…","event":{"type":"Temperature","value":27,"timestamp":…}}`.
+Beobachtete `type`-Werte: `Temperature`, `TemperatureSetpoint`, `Status` (z. B. `ready`),
+`RemainingTime`, `Setting`. Der WebSocket-Client ist minimal und kommt ohne Zusatzpakete aus.
+
+> Hinweis: `set`/`operate` wurden bisher nur gegen einen simulierten Server getestet, nicht an der
+> echten Maschine. Vor dem ersten echten Versuch nichts einspannen und danebenstehen.
+
 ## Fehlerbilder
 
 - **E:34** auf dem Display: falsches WLAN-Passwort
