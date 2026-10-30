@@ -99,6 +99,12 @@ Steuern ist komplexer als Auslesen und hier **bewusst nicht** umgesetzt:
 Das sauber umzusetzen heißt, den Heizer und den Motor fernauszulösen – daher erst nach einem
 Protokoll-Nachbau und nur mit leerer Schüssel und Aufsicht testen.
 
+**Empirisch bestätigt (am echten Gerät, leere Schüssel):** Fernsteuern des Kochens ist über diese
+Cloud-API nicht möglich. `POST {userApplianceUri}/features` akzeptiert laut App und Server nur das
+Feld `RemoteWeighing` (Waage); jedes andere Feld wird mit `422 / code 641 "Invalid feature"`
+abgelehnt, `operate` mit einem Nicht-Geräteschalter mit `500 KeyError`. Die Maschine blieb dabei
+unverändert auf `ready`. Die App schiebt Rezepte nur aufs Display – gestartet wird am Gerät.
+
 ## Fehlerbilder
 
 - **E:34** auf dem Display: falsches WLAN-Passwort
