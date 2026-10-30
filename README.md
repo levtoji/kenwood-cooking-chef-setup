@@ -63,9 +63,14 @@ nicht per HTTP antwortet; die lokale `/mac`/`/networks`/`/join`-API gibt es nur 
 Einrichtungsmodus unter `192.168.4.1`).
 
 ```sh
-python3 kenwood_control.py status     # Schnappschuss: Status, Ist-/Soll-Temperatur, Restzeit
-python3 kenwood_control.py watch      # Live-Stream der Events (Strg+C beendet)
+python3 kenwood_control.py status            # Schnappschuss über die Cloud
+python3 kenwood_control.py watch             # Live-Stream über die Cloud (Strg+C)
+python3 kenwood_control.py local-status --ip <IP>   # Schnappschuss direkt im LAN, OHNE Cloud
+python3 kenwood_control.py local-watch  --ip <IP>   # Live-Stream direkt im LAN, OHNE Cloud
 ```
+
+Die `local-*`-Befehle reden direkt mit der Maschine im Heimnetz und brauchen Kenwoods Server nicht.
+Ohne `--ip` wird die IP per ARP (und einmalig über die Cloud zur MAC-Ermittlung) gesucht.
 
 Protokoll (lesen):
 
@@ -104,6 +109,30 @@ Cloud-API nicht möglich. `POST {userApplianceUri}/features` akzeptiert laut App
 Feld `RemoteWeighing` (Waage); jedes andere Feld wird mit `422 / code 641 "Invalid feature"`
 abgelehnt, `operate` mit einem Nicht-Geräteschalter mit `500 KeyError`. Die Maschine blieb dabei
 unverändert auf `ready`. Die App schiebt Rezepte nur aufs Display – gestartet wird am Gerät.
+
+## Sicherheit und Langlebigkeit (Befunde am eigenen Gerät)
+
+**Lokaler WebSocket ohne Authentifizierung.** Die Maschine öffnet im Heimnetz auf Port 443 (TLS 1.2)
+einen WebSocket, der den Handshake auf *jedem* Pfad ohne Login annimmt und laufend Events im
+Klartext streamt (z. B. `{"event":{"type":"weightUpdate","value":178.0,"unit":"gram"}}`). Jeder im
+selben WLAN kann also mitlesen. Das TLS-Zertifikat ist nicht gerätespezifisch, sondern ein
+geräteübergreifendes, selbstsigniertes „Drop IoT"-Zertifikat (gültig 2018–2118) und bietet daher
+keine echte Authentifizierung.
+
+*Offen (bewusst nicht getestet):* ob dieser lokale Kanal auch **Befehle annimmt** – dann könnte
+jemand im WLAN die Maschine steuern. Das lässt sich nur mit Aufsicht am Gerät prüfen, da es Motor
+oder Heizung auslösen könnte.
+
+Praktische Konsequenz: Gäste-WLAN für IoT nutzen bzw. die Maschine vom Hauptnetz trennen, wenn das
+Mitlesen stört.
+
+**Was passiert, wenn Kenwood die Server abschaltet?**
+
+- **Kochen bleibt unberührt.** Die Cooking Chef ist ein eigenständiger Standmixer mit eigener
+  Bedienung; die Cloud liefert nur App-Komfort (Monitoring, Rezepte aufs Display).
+- **Lokales Auslesen bleibt möglich.** Der LAN-WebSocket funktioniert ohne Cloud – siehe
+  `local-watch`/`local-status`. Ein selbstgehostetes Tool kann die Maschine also weiter überwachen.
+- **Nur die Cloud-Features sterben:** App-Fernzugriff von unterwegs, Rezept-Push, Konto-Bindung.
 
 ## Fehlerbilder
 

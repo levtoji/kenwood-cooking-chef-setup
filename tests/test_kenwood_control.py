@@ -167,3 +167,17 @@ class ControlTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LocalDiscoveryTest(unittest.TestCase):
+    def test_find_local_ip_matches_mac(self):
+        arp_out = (
+            "? (192.168.1.1) at aa:bb:cc:00:00:01 on en0 ifscope [ethernet]\n"
+            "? (192.168.1.50) at aa:bb:cc:dd:ee:0 on en0 ifscope [ethernet]\n"
+        )
+        with mock.patch("subprocess.run", return_value=type("R", (), {"stdout": arp_out})()):
+            self.assertEqual(kc.find_local_ip("AABBCCDDEE00"), "192.168.1.50")
+
+    def test_find_local_ip_none_when_absent(self):
+        with mock.patch("subprocess.run", return_value=type("R", (), {"stdout": "? (192.168.1.1) at aa:bb:cc:00:00:01 on en0\n"})()):
+            self.assertIsNone(kc.find_local_ip("AABBCCDDEE00"))

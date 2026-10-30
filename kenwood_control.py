@@ -69,14 +69,16 @@ def events_url(cfg, token, user_uri):
 class WebSocket:
     """Gerade genug WebSocket, um Text-Frames zu empfangen (Client, TLS)."""
 
-    def __init__(self, url, timeout=70):
+    def __init__(self, url, timeout=70, insecure=False):
         parts = urllib.parse.urlsplit(url)
         host = parts.hostname
         port = parts.port or (443 if parts.scheme == "wss" else 80)
         path = parts.path + (("?" + parts.query) if parts.query else "")
         raw = socket.create_connection((host, port), timeout=timeout)
         if parts.scheme == "wss":
-            raw = ssl.create_default_context().wrap_socket(raw, server_hostname=host)
+            # insecure: Gerät nutzt ein geräteübergreifendes, selbstsigniertes Zertifikat.
+            context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
+            raw = context.wrap_socket(raw, server_hostname=host)
         self.sock = raw
         key = base64.b64encode(os.urandom(16)).decode()
         handshake = (
@@ -188,6 +190,53 @@ def stream_events(cfg, token, native_id, on_event, once=False, timeout=70):
         ws.close()
 
 
+# --- Lokal (ohne Cloud, direkt im Heimnetz) --------------------------------
+# Die Maschine bietet im LAN einen unauthentifizierten WebSocket auf 443 (TLS,
+# selbstsigniert), der Events im Klartext streamt. Funktioniert auch ohne Kenwood-Cloud.
+
+
+def find_local_ip(native_id):
+    """Sucht die IP der Maschine in der ARP-Tabelle anhand der MAC (native_id ohne Trenner)."""
+    import re
+    import subprocess
+    nid = native_id.lower().replace(":", "")
+    try:
+        out = subprocess.run(["arp", "-an"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in out.splitlines():
+        m = re.search(r"\(([0-9.]+)\) at ([0-9a-f:]+)", line)
+        if not m:
+            continue
+        # macOS kürzt führende Nullen je Byte (d1:0), daher jedes Byte auf 2 Stellen bringen.
+        mac = "".join(part.zfill(2) for part in m.group(2).split(":"))
+        if mac == nid:
+            return m.group(1)
+    return None
+
+
+def local_stream(ip, on_event, once=False, timeout=70):
+    """Liest Events direkt von der Maschine im LAN (read-only, keine Cloud)."""
+    ws = WebSocket(f"wss://{ip}:443/", timeout=timeout, insecure=True)
+    try:
+        while True:
+            raw = ws.recv()
+            if raw is None:
+                return
+            try:
+                message = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            etype, value = parse_event(message)
+            if etype is None:
+                continue
+            on_event(etype, value, message)
+            if once:
+                return
+    finally:
+        ws.close()
+
+
 # --- Steuern ---------------------------------------------------------------
 
 
@@ -224,15 +273,56 @@ class _Done(Exception):
     pass
 
 
+def _resolve_local_ip(args):
+    if args.ip:
+        return args.ip
+    cfg = ks.load_env()
+    _, _, native_id = user_appliance(cfg, ks.get_token(cfg), args.native_id)
+    ip = find_local_ip(native_id)
+    if not ip:
+        sys.exit("Maschine nicht im LAN gefunden. IP per --ip angeben (arp -an).")
+    return ip
+
+
+def cmd_local_watch(args):
+    ip = _resolve_local_ip(args)
+    print(f"Lokal verbunden mit {ip} (ohne Cloud). Strg+C beendet.")
+    local_stream(ip, lambda t, v, r: print(f"[{time.strftime('%H:%M:%S')}] {t} = {v}"), once=False, timeout=args.timeout)
+
+
+def cmd_local_status(args):
+    ip = _resolve_local_ip(args)
+    state = {}
+    deadline = time.time() + args.seconds
+    def collect(etype, value, _raw):
+        state[etype] = value
+        if time.time() >= deadline:
+            raise _Done()
+    try:
+        local_stream(ip, collect, once=False, timeout=args.seconds + 5)
+    except _Done:
+        pass
+    print(json.dumps(state, ensure_ascii=False, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--native-id", help="MAC/native_id, falls mehrere Geräte am Konto hängen")
     parser.add_argument("--timeout", type=int, default=70, help="Sekunden Wartezeit auf WebSocket-Events")
     sub = parser.add_subparsers(required=True)
 
-    p_status = sub.add_parser("status", help="Aktuellen Zustand als Schnappschuss ausgeben")
+    p_status = sub.add_parser("status", help="Aktuellen Zustand als Schnappschuss ausgeben (Cloud)")
     p_status.add_argument("--seconds", type=int, default=8, help="Sammeldauer für den Schnappschuss")
     p_status.set_defaults(func=cmd_status)
+
+    p_lw = sub.add_parser("local-watch", help="Live-Stream direkt aus dem LAN, ohne Cloud")
+    p_lw.add_argument("--ip", help="IP der Maschine (sonst per ARP/Cloud ermittelt)")
+    p_lw.set_defaults(func=cmd_local_watch)
+
+    p_ls = sub.add_parser("local-status", help="Schnappschuss direkt aus dem LAN, ohne Cloud")
+    p_ls.add_argument("--ip", help="IP der Maschine (sonst per ARP/Cloud ermittelt)")
+    p_ls.add_argument("--seconds", type=int, default=8)
+    p_ls.set_defaults(func=cmd_local_status)
     sub.add_parser("watch", help="Live-Zustand fortlaufend ausgeben").set_defaults(func=cmd_watch)
 
     args = parser.parse_args()
