@@ -134,6 +134,26 @@ Mitlesen stört.
   `local-watch`/`local-status`. Ein selbstgehostetes Tool kann die Maschine also weiter überwachen.
 - **Nur die Cloud-Features sterben:** App-Fernzugriff von unterwegs, Rezept-Push, Konto-Bindung.
 
+## Fazit: Cooking Chef XL (KCL95) vs. neueres Modell (KCL96)
+
+Die XL ist hardwareseitig ein vollwertiger vernetzter Kochmixer – das Modul kann WLAN, TLS und
+Telemetrie. Die **Fernsteuerung fehlt nicht aus technischen Gründen, sondern ist serverseitig nicht
+freigeschaltet**: Kenwoods Backend modelliert die XL (appliance 209) ohne Steuer-Capabilities und
+ohne Presets (siehe `PROTOCOL.md`, Abschnitt 5). Das ist Produktabgrenzung, kein Hardware-Limit.
+
+| | Cooking Chef XL (KCL95) | Cooking Chef KCL96 |
+|---|---|---|
+| App | Kenwood World (alt) | Kenwood & Me |
+| Einrichtung | WLAN-SoftAP (dieses Repo) | Bluetooth |
+| Live-Auslesen | ✅ (Cloud + lokal, siehe oben) | ✅ |
+| Fernsteuern (Kochen) | ❌ backend-seitig gesperrt | ✅ |
+| Preis | — | ~2× |
+
+**Praktische Konsequenz:** Für den doppelten Preis bekommt man im Kern genau das eine, das hier
+fehlt – Remote-Kochen und Bluetooth-Einrichtung. Wer mit Monitoring plus komfortablem Wieder-
+verbinden (dieses Repo) auskommt, braucht das Upgrade nicht. Fernsteuern an der XL nachzurüsten
+ginge nur über die Geräte-Firmware und ist hier bewusst nicht Gegenstand.
+
 ## Fehlerbilder
 
 - **E:34** auf dem Display: falsches WLAN-Passwort
