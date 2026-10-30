@@ -40,7 +40,14 @@ Der JWT steckt im WS-Pfad (Typ `events_channel`, enthält user_id). Event-Format
 {"user_id":…,"appliance_id":"…","native_id":"A8…","step_id":null,"preset_id":null,
  "event":{"type":"Temperature","value":27,"timestamp":169…}}
 ```
-Beobachtete/aus dem App-Enum bekannte `type`-Werte (Cloud, normalisiert):
+Am echten Gerät beobachtet (auch während manueller Bedienung mit leerer Schüssel):
+`TemperatureSetpoint` (Dial ~20–140 °C), `Temperature` (Ist), `RemainingTime` (Timer in s),
+`Setting` (Rohwert, zittert ~675–685, zeitweise `null` – vermutlich Last-/Motorsensor, nicht sicher),
+`Status` (blieb stets `ready`). **Nicht** beobachtet – auch nicht beim Kochen: `Heating`, `Program*`,
+`Status=running`. Dieses Modell liefert an die Cloud nur Basis-Telemetrie, keine Koch-Events.
+Zudem ignoriert der lokale WebSocket jede gesendete Anfrage (getStatus/deviceInfo/…) – er sendet nur.
+
+Weitere aus dem App-Enum bekannte `type`-Werte (nicht alle treten bei diesem Modell auf):
 `Temperature`, `TemperatureSetpoint`, `Heating`, `RemainingTime`, `Duration`, `ElapsedTime`,
 `TimeProgressing`, `Program`, `ProgramProgress`, `ProgramFinished`, `Status` (z. B. `ready`),
 `Setting`, `Weight`, `Power`, `Mode`, `RemoteControlEnabled`, `ReleasingPressure`,
