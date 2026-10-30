@@ -79,6 +79,18 @@ Im Leerlauf nur `weightUpdate`; weitere Typen bei Zustandsänderung. (→ `kenwo
 Empirisch am Gerät bestätigt: Soll-Temperatur 50 via `features`/`operate` → abgelehnt, Maschine
 blieb `ready`.
 
+**Capability-Befund (entscheidend):** Der Geräte-Datensatz des Backends für die XL
+(`GET /api/v1/appliances/209`, auch mit `Accept: application/vnd.drop.v4.client+json`) enthält **keine**
+Steuer-Fähigkeiten – keine `has_appliance_controls`, `capabilities`, `control_configuration` oder
+`has_presets`, nur `id/name/category "Standmixer"/image`. Der Preset-Katalog
+(`GET /api/v1/appliances/209/presets`) ist **leer** (0 Einträge). Die vollständige Liste der
+Schreib-Endpunkte (UserService/ApplianceService) kennt nichts, was ein Koch-Programm
+(Temperatur/Stufe/Zeit) ans Gerät sendet: `operate` (nur Geräteschalter), `features` (nur
+`RemoteWeighing`), `subscribeAppliancePreset` (setzt ein vordefiniertes Preset – für dieses Modell
+gibt es keine), plus Pairing/Rename/Delete/Subscribe. **Fazit:** Nicht nur unser Nachbau, sondern
+die Kenwood-App selbst kann dieses Modell nicht fernsteuern – das Backend modelliert es als reines
+Monitoring-Gerät.
+
 ## 6. Firmware
 
 Das Gerät meldet zwei Versionen: `iot_firmware_version` (WLAN-Modul) und `mcu_firmware_version`
