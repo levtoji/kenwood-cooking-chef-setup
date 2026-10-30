@@ -1,0 +1,4 @@
+kenwood.env
+__pycache__/
+*.apk
+*.xapk
